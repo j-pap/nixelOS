@@ -111,8 +111,17 @@ writeShellApplication {
     done
     HASH=$(echo -n "$PASS" | mkpasswd --method=SHA-512 --stdin)
 
-    ### Calculate and round the amount of system RAM for swap
-    RAM=$(awk '/^MemTotal/{ print $2/1000/1000 }' < /proc/meminfo | numfmt --to iec --suffix G)
+    ### Prompt for time zone
+    while true; do
+      TMZN=$(timedatectl list-timezones | gum choose --header="Select your time zone:" --ordered --height=30 --limit=1)
+      if [ -z "$TMZN" ]; then
+        gum style "A time zone must be selected!" --foreground="$YELLOW" && printf '\n'
+      else
+        gum confirm "Are you sure you want to select '$TMZN'?" --default=false && break || printf '\n'
+      fi
+    done
+    clear
+    printf '\n'
 
     ###
     ### GENERATE FILES / FORMAT DISK
@@ -140,6 +149,9 @@ writeShellApplication {
     mv "$NIXDIR"/hardware-configuration.nix "$NIXDIR"/host/hardware-configuration.nix
     rm -f "$NIXDIR"/configuration.nix
 
+    ### Calculate and round the amount of system RAM for swap
+    RAM=$(awk '/^MemTotal/{ print $2/1000/1000 }' < /proc/meminfo | numfmt --to iec --suffix G)
+
     ### Generate variables.nix from user prompts/swap calculation
     cat > "$NIXDIR"/host/variables.nix << EOF
     {
@@ -148,6 +160,7 @@ writeShellApplication {
         host = "$HOST";
         user = "$USER";
         pass = "$HASH";
+        time = "$TMZN";
         swap.size = "$RAM";
         swap.offset = "";
       };
@@ -165,7 +178,7 @@ writeShellApplication {
 
     ### Calculate swap offset post-formatting and insert into variables.nix
     OFFSET=$(btrfs inspect-internal map-swapfile -r /mnt/.swap/swapfile)
-    sed -i "8s/\".*\"/\"$OFFSET\"/" "$NIXDIR"/host/variables.nix
+    sed -i "9s/\".*\"/\"$OFFSET\"/" "$NIXDIR"/host/variables.nix
 
     ### Update flake.lock
     gum spin --title "Updating flake.lock..." --show-error -- nix flake update --refresh
