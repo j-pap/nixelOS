@@ -18,7 +18,7 @@ writeShellApplication {
   ];
   text = ''
     #
-    ### NixOS installation script
+    ### nixelOS installation script
 
     set -e
     BLUE="#00FFFF"
@@ -30,7 +30,7 @@ writeShellApplication {
     WHITE="#FFFFFF"
     export GUM_CHOOSE_CURSOR_FOREGROUND="$PINK"
     export GUM_CHOOSE_HEADER_FOREGROUND="$BLUE"
-    export GUM_CONFIRM_PROMPT_FOREGROUND="$RED"
+    export GUM_CONFIRM_PROMPT_FOREGROUND="$YELLOW"
     export GUM_CONFIRM_SELECTED_BACKGROUND="$PINK"
     export GUM_CONFIRM_SELECTED_FOREGROUND="$YELLOW"
     export GUM_INPUT_HEADER_FOREGROUND="$BLUE"
@@ -43,85 +43,109 @@ writeShellApplication {
       gum style "Error! This script requires root privileges; please re-run as root" --foreground="$YELLOW"
       exit 1
     fi
-    clear
-    printf '\n'
+    clear && printf '\n'
 
+    ###
     ### USER PROMPTS
     ###
-    ### Display available disk(s) and their size/mount(s)
-    DISK_COL_HEADER="$(lsblk -o name,size,mountpoints | grep 'NAME')"
-    gum style "$DISK_COL_HEADER" --foreground="$WHITE"
-    lsblk -o name,size,mountpoints | grep 'nvme[0-9]n[0-9]\|sd[a-z]\|vd[a-z]\|hd[a-z]'
-    printf '\n'
-
-    ### Put disks into array
+    ### Put disk(s) into array
     mapfile -t SYS_DISKS < <(find "/dev" -regex '/dev/nvme[0-9]n[0-9]\|/dev/sd[a-z]\|/dev/vd[a-z]\|/dev/hd[a-z]' | sort)
     if (( ''${#SYS_DISKS[@]} == 0 )); then
       gum style "No disk devices were found! Quitting..." --foreground="$YELLOW" >&2
       exit 1
     fi
 
-    ### Prompt from array for installation disk
+    ### Display & select installation disk
     while true; do
+      ### Display available disk(s) and their size/mount(s)
+      DISK_COL_HEADER="$(lsblk -o name,size,mountpoints | grep 'NAME')"
+      gum style "$DISK_COL_HEADER" --foreground="$WHITE"
+      lsblk -o name,size,mountpoints | grep 'nvme[0-9]n[0-9]\|sd[a-z]\|vd[a-z]\|hd[a-z]'
+      printf '\n'
+
+      ### Prompt for installation disk from array
       DISK=$(gum choose --header="Select a disk to be formatted for installation:" "''${SYS_DISKS[@]}")
       if [ -z "$DISK" ]; then
+        clear && printf '\n'
         gum style "A disk must be selected!" --foreground="$YELLOW" && printf '\n'
       else
         gum confirm "Are you sure you want to use $DISK?" --default=false && break || printf '\n'
       fi
     done
-    clear
-    printf '\n'
+    clear && printf '\n'
 
-    ### Prompt for host name
+    ### Prompt for hostname
     while true; do
-      HOST=$(gum input --header="What will the system's host name be?" --char-limit=63 --placeholder="host name" --value="nixel")
+      HOST=$(gum input --header="What will the system's hostname be?" --char-limit=63 --placeholder="hostname" --value="nixel")
       if [ -z "$HOST" ]; then
-        gum style "Host name cannot be blank!" --foreground="$YELLOW" && printf '\n'
+        clear && printf '\n'
+        gum style "Hostname cannot be blank!" --foreground="$YELLOW" && printf '\n'
       elif [[ "$HOST" =~ [^A-Za-z0-9-] ]]; then
+        clear && printf '\n'
         gum style "Only letters, numbers, and hyphens are allowed (no spaces)!" --foreground="$YELLOW" && printf '\n'
       else
         break
       fi
     done
+    clear && printf '\n'
 
     ### Prompt for user name
     while true; do
       USER=$(gum input --header="What will your user name be?" --char-limit=32 --placeholder="user name" | tr "[:upper:]" "[:lower:]")
       if [ -z "$USER" ]; then
-        gum style "You must set a User name!" --foreground="$YELLOW" && printf '\n'
+        clear && printf '\n'
+        gum style "You must set a user name!" --foreground="$YELLOW" && printf '\n'
       elif [[ "$USER" =~ [^a-z] ]]; then
+        clear && printf '\n'
         gum style "Only letters are allowed (no spaces)!" --foreground="$YELLOW" && printf '\n'
       else
         break
       fi
     done
+    clear && printf '\n'
 
     ### Prompt for user password & hash it
     while true; do
       PASS=$(gum input --header="What password would you like to assign to $USER?" --password --placeholder="password")
       PASS2=$(gum input --header="Re-enter password for verification: " --password --placeholder="confirm")
       if [ -z "$PASS" ] || [ -z "$PASS2" ]; then
-        gum style "You cannot set an empty user password!" --foreground="$YELLOW" && printf '\n'
+        clear && printf '\n'
+        gum style "You cannot set an empty password!" --foreground="$YELLOW" && printf '\n'
       elif [ "$PASS" = "$PASS2" ]; then
         break
       else
+        clear && printf '\n'
         gum style "The passwords do not match! Please try again" --foreground="$YELLOW" && printf '\n'
       fi
     done
     HASH=$(echo -n "$PASS" | mkpasswd --method=SHA-512 --stdin)
+    clear && printf '\n'
 
     ### Prompt for time zone
     while true; do
       TMZN=$(timedatectl list-timezones | gum choose --header="Select your time zone:" --ordered --height=30 --limit=1)
       if [ -z "$TMZN" ]; then
+        clear && printf '\n'
         gum style "A time zone must be selected!" --foreground="$YELLOW" && printf '\n'
       else
-        gum confirm "Are you sure you want to select '$TMZN'?" --default=false && break || printf '\n'
+        break
       fi
     done
-    clear
-    printf '\n'
+    clear && printf '\n'
+
+    ### Display & confirm user settings or quit
+    gum style "The following is a summary of your settings; please confirm everything looks correct:" --foreground="$GREEN" && printf '\n'
+    echo "$(gum style "     Disk:") $(gum style "$DISK" --foreground="$BLUE")"
+    echo "$(gum style " Hostname:") $(gum style "$HOST" --foreground="$BLUE")"
+    echo "$(gum style "     User:") $(gum style "$USER" --foreground="$BLUE")"
+    echo "$(gum style "Time zone:") $(gum style "$TMZN" --foreground="$BLUE")" && printf '\n'
+    if gum confirm "Are you ready to proceed with installation?" --default=false --affirmative="Install" --negative="Quit"; then
+      clear && printf '\n'
+    else
+      clear && printf '\n'
+      gum style "Installation cancelled." --foreground="$RED"
+      exit 1
+    fi
 
     ###
     ### GENERATE FILES / FORMAT DISK
@@ -144,12 +168,12 @@ writeShellApplication {
     STATE=$(grep "system.stateVersion = *" "$NIXDIR"/configuration.nix | sed 's/ #.*//')
     sed -i "$ i\\\n$STATE" "$NIXDIR"/hardware-configuration.nix
 
-    ### ...and then move & remove respective generated .nix configs
+    ### ...and then move / remove respective generated .nix config files
     mkdir -p "$NIXDIR"/host
     mv "$NIXDIR"/hardware-configuration.nix "$NIXDIR"/host/hardware-configuration.nix
     rm -f "$NIXDIR"/configuration.nix
 
-    ### Calculate and round the amount of system RAM for swap
+    ### Calculate & round the amount of system RAM for swap
     RAM=$(awk '/^MemTotal/{ print $2/1000/1000 }' < /proc/meminfo | numfmt --to iec --suffix G)
 
     ### Generate variables.nix from user prompts/swap calculation
@@ -176,7 +200,7 @@ writeShellApplication {
       exit 1
     fi
 
-    ### Calculate swap offset post-formatting and insert into variables.nix
+    ### Calculate swap offset post-formatting & insert into variables.nix
     OFFSET=$(btrfs inspect-internal map-swapfile -r /mnt/.swap/swapfile)
     sed -i "9s/\".*\"/\"$OFFSET\"/" "$NIXDIR"/host/variables.nix
 
