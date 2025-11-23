@@ -10,19 +10,21 @@ let
   # Find Flatpak package names: https://flathub.org/apps/search
   flatpak =
     let
+      #firefox = "org.mozilla.firefox";
       vlc = "org.videolan.VLC";
     in
     {
       # Auto-install the following Flatpaks:
       packages = [
+        #firefox
         vlc
         "com.github.tchx84.Flatseal" # Flatpak permissions
         "org.libreoffice.LibreOffice"
-        #"org.mozilla.firefox"
       ];
 
       # Create desktop shortcuts for the following Flatpaks:
       shortcuts = [
+        #firefox
         #vlc
       ];
     };
@@ -42,7 +44,7 @@ in
       ;
     };
     kernelModules = [ ];
-    kernelPackages = pkgs.linuxPackages_6_12;
+    kernelPackages = pkgs.linuxPackages;
     kernelParams = [
       "quiet"
     ];
