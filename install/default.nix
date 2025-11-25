@@ -39,8 +39,19 @@ writeShellApplication {
     export GUM_SPIN_SPINNER_FOREGROUND="$PURPLE"
     export GUM_SPIN_TITLE_FOREGROUND="$WHITE"
 
+    warn() {
+      clear && printf '\n'
+      gum style --foreground="$YELLOW" "$1"
+      printf '\n'
+    }
+
+    error() {
+      printf '\n'
+      gum style --foreground="$RED" "$1"
+    }
+
     if [[ $EUID != 0 ]]; then
-      gum style "Error! This script requires root privileges; please re-run as root" --foreground="$YELLOW"
+      warn "Error! This script requires root privileges; please re-run as root"
       exit 1
     fi
     clear && printf '\n'
@@ -51,38 +62,42 @@ writeShellApplication {
     ### Put disk(s) into array
     mapfile -t SYS_DISKS < <(find "/dev" -regex '/dev/nvme[0-9]n[0-9]\|/dev/sd[a-z]\|/dev/vd[a-z]\|/dev/hd[a-z]' | sort)
     if (( ''${#SYS_DISKS[@]} == 0 )); then
-      gum style "No disk devices were found! Quitting..." --foreground="$YELLOW" >&2
+      warn "No disk devices were found! Quitting..." >&2
       exit 1
     fi
 
     ### Display & select installation disk
     while true; do
-      ### Display available disk(s) and their size/mount(s)
-      DISK_COL_HEADER="$(lsblk -o name,size,mountpoints | grep 'NAME')"
-      gum style "$DISK_COL_HEADER" --foreground="$WHITE"
+      ### Display header columns/available disk(s) & their size/mount(s)
+      gum style --foreground="$WHITE" \
+        "$(lsblk -o name,size,mountpoints | grep 'NAME')"
       lsblk -o name,size,mountpoints | grep 'nvme[0-9]n[0-9]\|sd[a-z]\|vd[a-z]\|hd[a-z]'
       printf '\n'
 
       ### Prompt for installation disk from array
-      DISK=$(gum choose --header="Select a disk to be formatted for installation:" "''${SYS_DISKS[@]}")
+      DISK=$(gum choose \
+        --header="Select a disk to be formatted for installation:" \
+        "''${SYS_DISKS[@]}"
+      )
       if [ -z "$DISK" ]; then
-        clear && printf '\n'
-        gum style "A disk must be selected!" --foreground="$YELLOW" && printf '\n'
+        warn "A disk must be selected!"
       else
-        gum confirm "Are you sure you want to use $DISK?" --default=false && break || printf '\n'
+        gum confirm --default=false \
+          "Are you sure you want to use $DISK?" && break || printf '\n'
       fi
     done
     clear && printf '\n'
 
     ### Prompt for hostname
     while true; do
-      HOST=$(gum input --header="What will the system's hostname be?" --char-limit=63 --placeholder="hostname" --value="nixel")
+      HOST=$(gum input --char-limit=63 \
+        --placeholder="hostname" --value="nixel" \
+        --header="What will the system's hostname be?"
+      )
       if [ -z "$HOST" ]; then
-        clear && printf '\n'
-        gum style "Hostname cannot be blank!" --foreground="$YELLOW" && printf '\n'
+        warn "Hostname cannot be blank!"
       elif [[ "$HOST" =~ [^A-Za-z0-9-] ]]; then
-        clear && printf '\n'
-        gum style "Only letters, numbers, and hyphens are allowed (no spaces)!" --foreground="$YELLOW" && printf '\n'
+        warn "Only letters, numbers, and hyphens are allowed (no spaces)!"
       else
         break
       fi
@@ -91,13 +106,14 @@ writeShellApplication {
 
     ### Prompt for user name
     while true; do
-      USER=$(gum input --header="What will your user name be?" --char-limit=32 --placeholder="user name" | tr "[:upper:]" "[:lower:]")
+      USER=$(gum input --char-limit=32 \
+        --placeholder="user name" \
+        --header="What will your user name be?" | tr "[:upper:]" "[:lower:]"
+      )
       if [ -z "$USER" ]; then
-        clear && printf '\n'
-        gum style "You must set a user name!" --foreground="$YELLOW" && printf '\n'
+        warn "You must set a user name!"
       elif [[ "$USER" =~ [^a-z] ]]; then
-        clear && printf '\n'
-        gum style "Only letters are allowed (no spaces)!" --foreground="$YELLOW" && printf '\n'
+        warn "Only letters are allowed (no spaces)!"
       else
         break
       fi
@@ -106,16 +122,20 @@ writeShellApplication {
 
     ### Prompt for user password & hash it
     while true; do
-      PASS=$(gum input --header="What password would you like to assign to $USER?" --password --placeholder="password")
-      PASS2=$(gum input --header="Re-enter password for verification: " --password --placeholder="confirm")
+      PASS=$(gum input --password \
+        --placeholder="password" \
+        --header="What password would you like to assign to $USER?"
+      )
+      PASS2=$(gum input --password \
+        --placeholder="confirm" \
+        --header="Re-enter password for verification:"
+      )
       if [ -z "$PASS" ] || [ -z "$PASS2" ]; then
-        clear && printf '\n'
-        gum style "You cannot set an empty password!" --foreground="$YELLOW" && printf '\n'
+        warn "You cannot set an empty password!"
       elif [ "$PASS" = "$PASS2" ]; then
         break
       else
-        clear && printf '\n'
-        gum style "The passwords do not match! Please try again" --foreground="$YELLOW" && printf '\n'
+        warn "The passwords do not match! Please try again"
       fi
     done
     HASH=$(echo -n "$PASS" | mkpasswd --method=SHA-512 --stdin)
@@ -123,10 +143,11 @@ writeShellApplication {
 
     ### Prompt for time zone
     while true; do
-      TMZN=$(timedatectl list-timezones | gum choose --header="Select your time zone:" --ordered --height=30 --limit=1)
+      TMZN=$(timedatectl list-timezones | gum choose --ordered --height=30 --limit=1 \
+        --header="Select your time zone:"
+      )
       if [ -z "$TMZN" ]; then
-        clear && printf '\n'
-        gum style "A time zone must be selected!" --foreground="$YELLOW" && printf '\n'
+        warn "A time zone must be selected!"
       else
         break
       fi
@@ -134,17 +155,21 @@ writeShellApplication {
     clear && printf '\n'
 
     ### Display & confirm user settings or quit
-    gum style "The following is a summary of your settings; please confirm everything looks correct:" --foreground="$GREEN" && printf '\n'
-    echo "$(gum style "     Disk:") $(gum style "$DISK" --foreground="$BLUE")"
-    echo "$(gum style " Hostname:") $(gum style "$HOST" --foreground="$BLUE")"
-    echo "$(gum style "     User:") $(gum style "$USER" --foreground="$BLUE")"
-    echo "$(gum style "Time zone:") $(gum style "$TMZN" --foreground="$BLUE")" && printf '\n'
-    if gum confirm "Are you ready to proceed with installation?" --default=false --affirmative="Install" --negative="Quit"; then
+    gum style --foreground="$GREEN" \
+      "The following is a summary of your settings; please confirm everything looks correct:" && printf '\n'
+    echo "$(gum style "     Disk:") $(gum style --foreground="$BLUE" "$DISK")"
+    echo "$(gum style " Hostname:") $(gum style --foreground="$BLUE" "$HOST")"
+    echo "$(gum style "     User:") $(gum style --foreground="$BLUE" "$USER")"
+    echo "$(gum style "Time Zone:") $(gum style --foreground="$BLUE" "$TMZN")" && printf '\n'
+    if gum confirm --default=false \
+      --affirmative="Install" \
+      --negative="Quit" \
+      "Are you ready to proceed with installation?";
+    then
       clear && printf '\n'
     else
-      clear && printf '\n'
-      gum style "Installation cancelled." --foreground="$RED"
-      exit 1
+      error "Installation cancelled."
+      exit 0
     fi
 
     ###
@@ -154,15 +179,22 @@ writeShellApplication {
     NIXDIR=$(mktemp -d -t nixos-XXXXX)
 
     ### Clone git repo into /tmp for disko & create new git branch
-    if ! gum spin --title "Cloning Git repo..." -- git clone https://github.com/j-pap/nixelOS.git "$NIXDIR"; then
-      gum style "Failed to clone Git repository!" --foreground="$RED"
+    if ! gum spin \
+      --title "Cloning Git repo..." \
+      -- git clone https://github.com/j-pap/nixelOS.git "$NIXDIR";
+    then
+      error "Failed to clone Git repository!"
       exit 1
     fi
     cd "$NIXDIR"
-    gum spin --title "Creating new Git branch..." --show-error -- git switch -c deployment
+    gum spin --show-error \
+      --title "Creating new Git branch..." \
+      -- git switch -c deployment
 
     ### Generate .nix configuration files
-    gum spin --title "Generating NixOS configuration files..." --show-error -- nixos-generate-config --no-filesystems --dir "$NIXDIR"
+    gum spin --show-error \
+      --title "Generating NixOS configuration files..." \
+      -- nixos-generate-config --no-filesystems --dir "$NIXDIR"
 
     ### Copy system.stateVersion to hardware-configuration.nix
     STATE=$(grep "system.stateVersion = *" "$NIXDIR"/configuration.nix | sed 's/ #.*//')
@@ -192,11 +224,14 @@ writeShellApplication {
     EOF
 
     ### Format & mount via disko
-    if gum spin --title "Formatting & mounting disk..." --show-error -- disko --mode disko --flake "$NIXDIR"#nixel; then
-      gum style "Formatting complete!" --foreground="$GREEN"
+    if gum spin --show-error \
+      --title "Formatting & mounting disk..." \
+      -- disko --mode disko --flake "$NIXDIR"#nixel;
+    then
+      gum style --foreground="$GREEN" \
+        "Formatting complete!"
     else
-      printf '\n'
-      gum style "Formatting failed! Please try again" --foreground="$RED"
+      error "Formatting failed! Please try again"
       exit 1
     fi
 
@@ -205,7 +240,9 @@ writeShellApplication {
     sed -i "9s/\".*\"/\"$OFFSET\"/" "$NIXDIR"/host/variables.nix
 
     ### Update flake.lock
-    gum spin --title "Updating flake.lock..." --show-error -- nix flake update --refresh
+    gum spin --show-error \
+      --title "Updating flake.lock..." \
+      -- nix flake update --refresh
 
     ### Copy repo from /tmp to formatted install disk
     mkdir -p /mnt/etc/nixos && cd "$_"
@@ -213,22 +250,27 @@ writeShellApplication {
 
     ### Commit generated .nix files so they build with install
     git add /mnt/etc/nixos
-    { git -c user.email="nixel@null.local" -c user.name="nixel" commit -m "Committed .nix files generated @ install" > /dev/null; } 2>&1
+    { git commit \
+      -c user.email="nixel@null.local" \
+      -c user.name="nixel" \
+      -m "Commit .nix files generated @ install" > /dev/null;
+    } 2>&1
 
     ###
     ### INSTALLATION / FINALIZATION
     ###
     ### NixOS installation
-    gum style "Performing installation, please be patient..." --foreground="$BLUE"
+    gum style --foreground="$BLUE" \
+      "Performing installation, please be patient..."
     printf '\n'
     if ! nixos-install --no-root-passwd --flake /mnt/etc/nixos#nixel; then
-      printf '\n'
-      gum style "Installation failed! Please try again" --foreground="$RED"
+      error "Installation failed! Please try again"
       exit 1
     fi
 
     ### Create XDG directories
-    install -d -m 755 -o 1000 -g 100 /mnt/home/"$USER"/{.config/cinnamon/backgrounds,Desktop,Documents,Downloads,Music,Pictures,Videos}
+    install -d -m 755 -o 1000 -g 100 \
+      /mnt/home/"$USER"/{.config/cinnamon/backgrounds,Desktop,Documents,Downloads,Music,Pictures,Videos}
 
     ### Create Cinnamon desktop background source directory list
     chown -R 1000:100 /mnt/home/"$USER"/.config/
@@ -239,11 +281,16 @@ writeShellApplication {
     EOF
     ) /mnt/home/"$USER"/.config/cinnamon/backgrounds/user-folders.lst
 
-    ### Create post-install snapshots of /home & /var for potential powerwashing
-    gum spin --title "Taking snapshot of /home..." -- btrfs subvolume snapshot -r /mnt/home /mnt/.snapshots/home-snap > /dev/null
-    gum spin --title "Taking snapshot of /var..." -- btrfs subvolume snapshot -r /mnt/var /mnt/.snapshots/var-snap > /dev/null
-
+    ### Create post-install snapshots for potential powerwashing
+    gum spin \
+      --title "Taking snapshot of /home..." \
+      -- btrfs subvolume snapshot -r /mnt/home /mnt/.snapshots/home-snap > /dev/null
+    gum spin \
+      --title "Taking snapshot of /var..." \
+      -- btrfs subvolume snapshot -r /mnt/var /mnt/.snapshots/var-snap > /dev/null
     printf '\n'
-    gum style "Installation complete! Please reboot when ready" --foreground="$GREEN"
+
+    gum style --foreground="$GREEN" \
+      "Installation complete! Please reboot when ready"
   '';
 }
