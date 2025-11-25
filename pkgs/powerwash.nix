@@ -13,7 +13,10 @@
 }:
 
 let
-  diskDev = config.disko.devices.disk.main.content.partitions.ROOT.device;
+  disk = config.disko.devices.disk.main.content.partitions.ROOT;
+  device = disk.device;
+  homeOpts = builtins.concatStringsSep "," disk.content.subvolumes."@home".mountOptions;
+  varOpts = builtins.concatStringsSep "," disk.content.subvolumes."@var".mountOptions;
 
   name = "powerwash";
 
@@ -37,7 +40,7 @@ let
     ];
     text = ''
       #
-      ### NixOS powerwash script
+      ### nixelOS powerwash script
 
       set -e
       BLUE="#00FFFF"
@@ -54,65 +57,106 @@ let
       export GUM_SPIN_SPINNER_FOREGROUND="$PURPLE"
       export GUM_SPIN_TITLE_FOREGROUND="$WHITE"
 
+      error() {
+        printf '\n'
+        gum style --foreground="$RED" "$1"
+      }
+
       if [[ $EUID != 0 ]]; then
-        gum style "Error! This script requires root privileges; please re-run as root" --foreground="$YELLOW"
+        gum style --foreground="$YELLOW" \
+          "Error! This script requires root privileges; please re-run as root"
         exit 1
       fi
       cd /
       printf '\n'
 
       ### Confirm powerwashing
-      gum style "This will delete all Flatpak packages and user data!" --bold --background="$RED" --foreground="$YELLOW"
-      gum confirm "Are you sure you want to proceed?" --default=false && gum style 'Okay, but...' --bold --foreground="$YELLOW" || exit 0
-      gum confirm "...are you really sure?" --default=false && gum style 'Proceeding with powerwashing...' || exit 0
+      gum style --bold --background="$RED" --foreground="$YELLOW" \
+        "This will delete all Flatpak packages and user data!"
+      gum confirm --default=false \
+        "Are you sure you want to proceed?" && gum style --bold --foreground="$YELLOW" \
+        "Okay, but..." || exit 0
+      gum confirm --default=false \
+        "...are you really sure?" && gum style \
+        "Proceeding with powerwashing..." || exit 0
 
       ### Unmount btrfs subvolumes
       if ! umount --lazy /home /var; then
-        gum style "An error occurred unmounting the filesystems" --foreground="$RED"
+        error "An error occurred unmounting the filesystems"
         exit 1
       fi
 
       ### Remount subvolumes under /tmp
       MNT=$(mktemp -d -t btrfs-XXXXX)
-      mount ${diskDev} "$MNT"
+      mount ${device} "$MNT"
       ### Unmount & remove /tmp directory on exit
       trap 'umount "$MNT"; rm -rf "$MNT"' EXIT
 
       ### Delete existing home subvolume & restore from snapshot
-      gum spin --title "Deleting /home subvolume..." -- btrfs subvolume delete "$MNT"/@home || gum style "An error occurred deleting the @home subvolume" --foreground="$RED"
-      gum spin --title "Restoring /home from snapshot..." -- btrfs subvolume snapshot "$MNT"/@snaps/home-snap "$MNT"/@home || gum style "An error occurred restoring the @home subvolume" --foreground="$RED"
+      gum spin \
+        --title "Deleting /home subvolume..." \
+        -- btrfs subvolume delete "$MNT"/@home || error "An error occurred deleting the @home subvolume"
+      gum spin \
+        --title "Restoring /home from snapshot..." \
+        -- btrfs subvolume snapshot "$MNT"/@snaps/home-snap "$MNT"/@home || error "An error occurred restoring the @home subvolume"
 
       ### Remove specific /var directories
-      gum spin --title "Removing Flatpaks and miscellaneous data..." -- rm -rf \
+      gum spin \
+        --title "Removing Flatpaks and miscellaneous data..." \
+        -- rm -rf \
         "$MNT"/@var/log \
         "$MNT"/@var/lib/flatpak \
-        "$MNT"/@var/lib/NetworkManager || gum style "An error occurred removing /var directories" --foreground="$RED"
+        "$MNT"/@var/lib/NetworkManager || error "An error occurred removing /var directories"
 
       ### Copy default /var/log directory from snapshot
-      gum spin --title "Restoring /var/log from snapshot..." -- cp -r "$MNT"/@snaps/var-snap/log "$MNT"/@var/ || gum style "An error occurred restoring log directory" --foreground="$RED"
+      gum spin \
+        --title "Restoring /var/log from snapshot..." \
+        -- cp -r "$MNT"/@snaps/var-snap/log "$MNT"/@var/ || error "An error occurred restoring log directory"
 
       ### Remount newly-restored subvolumes
-      gum spin --title "Mounting /home..." -- mount -o compress=zstd,discard=async,subvol=@home /home || gum style "An error occurred re-mounting the /home filesystem" --foreground="$RED"
-      gum spin --title "Mounting /var..." -- mount -o compress=zstd,discard=async,noatime,subvol=@var /var || gum style "An error occurred re-mounting the /var filesystem" --foreground="$RED"
+      gum spin \
+        --title "Mounting /home..." \
+        -- mount -o ${homeOpts},subvol=@home /home || error "An error occurred re-mounting the /home filesystem"
+      gum spin \
+        --title "Mounting /var..." \
+        -- mount -o ${varOpts},subvol=@var /var || error "An error occurred re-mounting the /var filesystem"
 
       ### Re-install Flatpaks
-      if ! gum spin --title "Re-installing default Flatpaks. This can take several minutes..." -- systemctl start flatpak-managed-install-timer.service; then
-        gum style "There was an error re-installing the Flatpaks" --foreground="$RED"
+      if ! gum spin \
+        --title "Re-installing default Flatpaks. This can take several minutes..." \
+        -- systemctl start flatpak-managed-install-timer.service;
+      then
+        error "There was an error re-installing the Flatpaks"
       else
-        gum style "Default Flatpaks have been re-installed" --foreground="$BLUE"
+        gum style --foreground="$BLUE" \
+          "Default Flatpaks have been re-installed"
       fi
 
       ### Clean system
-      gum spin --title "Collecting Nix garbage..." --show-output -- nix-collect-garbage -d || gum style "There was an error collecting the garbage" --foreground="$RED"
+      gum spin --show-output \
+        --title "Collecting Nix garbage..." \
+        -- nix-collect-garbage -d || error "There was an error collecting the garbage"
+
+      ### Remove previous network connection(s)
+      gum spin \
+        --title "Removing previous network connection(s)..." \
+        -- rm -rf /etc/NetworkManager/{system-connections,VPN} || error "An error occurred removing the network connection(s)"
 
       ### Rebuild system
-      if ! gum spin --title "Rebuilding the system..." --show-output -- nixos-rebuild switch --flake /etc/nixos#nixel; then
-        gum style "There was an error rebullding the system" --foreground="$RED"
+      if ! gum spin --show-output \
+        --title "Rebuilding the system..." \
+        -- nixos-rebuild switch --flake /etc/nixos#nixel;
+      then
+        error "There was an error rebullding the system"
         exit 1
       else
         ### Prompt for reboot
-        gum style "Finished! Make sure to reboot for changes to take effect" --foreground="$GREEN"
-        gum confirm "Would you like to reboot now?" --affirmative="Reboot now" --negative="Reboot later" && systemctl reboot || exit 0
+        gum style --foreground="$GREEN" \
+          "Finished! Make sure to reboot for changes to take effect" && printf '\n'
+        gum confirm \
+          --affirmative="Reboot now" \
+          --negative="Reboot later" \
+          "Would you like to reboot now?" && systemctl reboot || exit 0
       fi
     '';
   };
