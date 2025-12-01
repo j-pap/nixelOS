@@ -14,7 +14,7 @@ running the single command, and answering the prompts that follow.
 The recommended minimum system specs are at least 8GB of RAM and a 32GB disk.
 
 nixelOS is currently utilizing:
-- Nixpkgs: nixos-25.05
+- Nixpkgs: nixos-25.11
 - Linux Kernel: LTS 6.12
 
 #### Disk Layout
