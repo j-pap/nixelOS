@@ -242,7 +242,7 @@ writeShellApplication {
     ### Update flake.lock
     gum spin --show-error \
       --title "Updating flake.lock..." \
-      -- nix flake update --refresh
+      -- nix flake update --refresh --extra-experimental-features 'nix-command flakes'
 
     ### Copy repo from /tmp to formatted install disk
     mkdir -p /mnt/etc/nixos && cd "$_"
@@ -250,11 +250,12 @@ writeShellApplication {
 
     ### Commit generated .nix files so they build with install
     git add /mnt/etc/nixos
-    { git commit \
+    { git \
       -c user.email="nixel@null.local" \
       -c user.name="nixel" \
-      -m "Commit .nix files generated @ install" > /dev/null;
+      commit -m "Commit .nix files generated @ install" > /dev/null;
     } 2>&1
+    clear && printf '\n'
 
     ###
     ### INSTALLATION / FINALIZATION
