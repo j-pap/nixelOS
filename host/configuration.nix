@@ -199,6 +199,7 @@ in
     btrfs.autoScrub.enable = true;
     fwupd.enable = true;
     printing.enable = true;
+    tzupdate.enable = true;
 
     flatpak = {
       enable = true;
