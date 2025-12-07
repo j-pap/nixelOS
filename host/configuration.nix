@@ -75,10 +75,7 @@ in
 
   console.keyMap = "us";
   i18n.defaultLocale = "en_US.UTF-8";
-  time = {
-    hardwareClockInLocalTime = true;
-    timeZone = lib.mkDefault vars.time;
-  };
+  time.timeZone = lib.mkDefault vars.time;
 
   environment = {
     cinnamon.excludePackages = [ ];
