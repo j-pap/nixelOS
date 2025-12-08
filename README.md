@@ -53,12 +53,13 @@ Once the NixOS installer has booted, run the following command:
 sudo nix --experimental-features "nix-command flakes" run github:j-pap/nixelOS
 ```
 
-After the script has initialized, you'll be prompted for the following four items
+After the script has initialized, you'll be prompted for the following five items
 before proceeding with formatting and installation:
 - Install disk (all disks displayed & confirmation to verify correct disk)
-- Host name (only letters, numbers, and hyphens allowed; 63 character max)
+- Hostname (only letters, numbers, and hyphens allowed; 63 character max)
 - User name (only letters allowed; 32 character max)
-- Password (confirmation to verify the password was typed correctly; then hashed)
+- Password (confirmation to verify the password was typed correctly; hashed)
+- Time zone (select from a global list)
 
 A variables.nix file will be generated containing these values, which is used as
 a template for several definitions used throughout the system configuration.
