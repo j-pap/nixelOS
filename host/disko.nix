@@ -42,17 +42,17 @@
               "--label nixelOS"
             ];
             /*
-            postCreateHook = let
-              diskDev = config.disko.devices.disk.main.content.partitions.ROOT.device; # /dev/disk/by-partlabel/root
-            in
-            ''
-              # Create empty snapshots of /home & /var for potential powerwashing
-              MNT=$(mktemp -d -t btrfs-XXXXX)
-              mount -o compress=zstd ${diskDev} "$MNT"
-              trap 'cd /; umount "$MNT"; rm -rf "$MNT"' EXIT
-              btrfs subvolume snapshot -r "$MNT"/@home "$MNT"/@snaps/home-blank
-              btrfs subvolume snapshot -r "$MNT"/@var "$MNT"/@snaps/var-blank
-            '';
+              postCreateHook = let
+                diskDev = config.disko.devices.disk.main.content.partitions.ROOT.device; # /dev/disk/by-partlabel/root
+              in
+              ''
+                # Create empty snapshots of /home & /var for potential powerwashing
+                MNT=$(mktemp -d -t btrfs-XXXXX)
+                mount -o compress=zstd ${diskDev} "$MNT"
+                trap 'cd /; umount "$MNT"; rm -rf "$MNT"' EXIT
+                btrfs subvolume snapshot -r "$MNT"/@home "$MNT"/@snaps/home-blank
+                btrfs subvolume snapshot -r "$MNT"/@var "$MNT"/@snaps/var-blank
+              '';
             */
             subvolumes =
               let

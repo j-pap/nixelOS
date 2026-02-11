@@ -41,7 +41,7 @@ in
     extraModulePackages = builtins.attrValues {
       inherit (config.boot.kernelPackages)
         #kernelPkgName
-      ;
+        ;
     };
     kernelModules = [ ];
     kernelPackages = pkgs.linuxPackages;
@@ -103,7 +103,7 @@ in
         usbutils
         variety
         vim
-      ;
+        ;
     };
   };
 
@@ -162,7 +162,7 @@ in
           name = "nixos-wallpapers";
           paths = builtins.filter lib.isDerivation (builtins.attrValues final.nixos-artwork.wallpapers);
         };
-        powerwash = prev.callPackage ../pkgs/powerwash.nix { inherit config; };
+        powerwash = prev.callPackage ../pkgs/powerwash { inherit config; };
       })
     ];
   };

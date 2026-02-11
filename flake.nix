@@ -41,7 +41,7 @@
 
       packages = forEachSystem (system: {
         default = self.packages.${system}.install;
-        install = nixpkgs.legacyPackages.${system}.callPackage ./install { };
+        install = nixpkgs.legacyPackages.${system}.callPackage ./pkgs/install { };
       });
     };
 }
