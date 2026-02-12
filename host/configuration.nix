@@ -223,7 +223,7 @@ in
 
   system.autoUpgrade = {
     enable = true;
-    flake = "path:${inputs.self.outPath}#nixel";
+    flake = "/etc/nixos#nixel";
     flags = [ ];
     operation = "switch";
     persistent = true;
@@ -238,48 +238,42 @@ in
   };
 
   systemd = {
-    services.nixos-upgrade.preStart =
-      let
-        date = lib.getExe' pkgs.coreutils "date";
-        echo = lib.getExe' pkgs.coreutils "echo";
-        git = lib.getExe' config.programs.git.package "git";
-        nix = lib.getExe' config.nix.package "nix";
-      in
-      ''
-        timestamp=$(${date} "+%Y/%m/%d %R")
-        cd /etc/nixos
+    services.nixos-upgrade = {
+      serviceConfig.workingDirectory = "/etc/nixos";
+      preStart = ''
+        timestamp=$(date "+%Y/%m/%d %R")
+        cd /etc/nixos || exit
 
-        ${echo} "### Resetting local branch changes..."
-        ${git} reset --hard
-        ${git} clean -dfx
+        echo "### Resetting local branch changes..."
+        git reset --hard
+        git clean -dfx
 
-        ${echo} "### Switching to 'main' branch..."
-        ${git} switch main
-        ${echo} "### Updating 'main' branch..."
-        ${git} pull
-        ${echo} "### Switching to 'deployment' branch..."
-        ${git} switch deployment
-        ${echo} "### Merging 'main' branch into 'deployment'..."
-        ${git} merge -m "Merge upstream updates from branch 'main' into 'deployment' - $timestamp" main
+        echo "### Switching to 'main' branch..."
+        git switch main
+        echo "### Updating 'main' branch..."
+        git pull
+        echo "### Switching to 'deployment' branch..."
+        git switch deployment
+        echo "### Merging 'main' branch into 'deployment'..."
+        git merge -m "Merge upstream updates from branch 'main' into 'deployment' - $timestamp" main
 
-        ${echo} "### Updating flake.lock..."
-        ${nix} flake update
-
-        if [ `git status --porcelain=1 | wc -l` -ne 0 ]; then
-          ${echo} "### Committing changes detected in flake.lock"
-          ${git} add flake.lock
-          ${git} commit -m "flake.lock updated - $timestamp"
+        echo "### Updating flake.lock..."
+        nix flake update
+        if [ "$(git status --porcelain=1 | wc -l)" -ne 0 ]; then
+          echo "### Committing changes detected in flake.lock"
+          git add flake.lock
+          git commit -m "flake.lock updated - $timestamp"
         else
-          ${echo} "### No changes detected in flake.lock"
+          echo "### No changes detected in flake.lock"
         fi
 
-        ${echo} "### Starting NixOS upgrade..."
+        echo "### Starting NixOS upgrade..."
       '';
+    };
 
     user.services.desktop-shortcuts = {
       enable = lib.mkIf (lib.length flatpak.shortcuts > 0) true;
-      description = "Softlink specified Flatpak shortcuts to the user's desktop";
-      wantedBy = [ "default.target" ];
+      description = "Create desktop shortcuts for specified Flatpaks";
       serviceConfig = {
         Type = "oneshot";
         ExecStart = pkgs.writeShellScript "desktop-shortcuts" (
@@ -289,11 +283,12 @@ in
               let
                 appName = lib.last (lib.splitString "." app);
               in
-              "${lib.getExe' pkgs.coreutils "ln"} -s -f /var/lib/flatpak/exports/share/applications/${app}.desktop /home/${vars.user}/Desktop/${appName}.desktop"
+              "ln -s -f /var/lib/flatpak/exports/share/applications/${app}.desktop /home/${vars.user}/Desktop/${appName}.desktop"
             ) flatpak.shortcuts
           )
         );
       };
+      wantedBy = [ "default.target" ];
     };
   };
 
