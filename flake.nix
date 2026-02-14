@@ -13,11 +13,10 @@
   outputs =
     { self, nixpkgs, ... }@inputs:
     let
-      supportedSystems = [
+      forEachSystem = nixpkgs.lib.genAttrs [
         "aarch64-linux"
         "x86_64-linux"
       ];
-      forEachSystem = nixpkgs.lib.genAttrs supportedSystems;
     in
     {
       # `nix run github:j-pap/nixelOS`
