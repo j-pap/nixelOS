@@ -98,6 +98,7 @@ in
         nixos-wallpapers
         pciutils
         powerwash
+        system-config-printer
         tldr
         tree
         usbutils
@@ -114,6 +115,10 @@ in
     };
     enableAllFirmware = true;
     firmware = [ pkgs.linux-firmware ];
+    sane = {
+      enable = true;
+      extraBackends = [ ];
+    };
   };
 
   networking = {
@@ -195,7 +200,6 @@ in
   services = {
     btrfs.autoScrub.enable = true;
     fwupd.enable = true;
-    printing.enable = true;
     tzupdate.enable = true;
 
     flatpak = {
@@ -212,6 +216,12 @@ in
         enable = true;
         onCalendar = "weekly";
       };
+    };
+
+    printing = {
+      enable = true;
+      cups-pdf.enable = true;
+      drivers = [ ];
     };
 
     xserver = {
@@ -298,7 +308,9 @@ in
       extraGroups = [
         "audio"
         "input"
+        "lpadmin"
         "networkmanager"
+        "scanner"
         "video"
         "wheel"
       ];
